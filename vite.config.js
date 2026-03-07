@@ -17,4 +17,17 @@ export default defineConfig({
             },
         }),
     ],
+    resolve: {
+        dedupe: ['vue'],
+    },
+    server: {
+        host: 'localhost',
+        port: 5173,
+        strictPort: true,
+        hmr: {
+            host: 'localhost',
+            port: 5173,
+            clientPort: 5173,
+        },
+    },
 });
