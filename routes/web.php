@@ -16,10 +16,17 @@ Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+Route::middleware(['auth', 'verified'])
+    ->name('web.')
+    ->group(function () {
+
+        Route::get('/cocktails', fn () => Inertia::render('Cocktail/Index'))->name('cocktail.index');
+        Route::get('/cocktails/create', fn () => Inertia::render('Cocktail/Create'))->name('cocktail.create');
+        Route::get('/cocktails/{id}/edit', fn ($id) => Inertia::render('Cocktail/Edit', ['id' => $id]))->name('cocktail.edit');
+
+        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 require __DIR__.'/auth.php';

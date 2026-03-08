@@ -39,6 +39,12 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink
+                                    :href="route('web.cocktail.index')"
+                                    :active="route().current('web.cocktail.index')"
+                                >
+                                    Cocktails
+                                </NavLink>
                             </div>
                         </div>
 
@@ -72,7 +78,7 @@ const showingNavigationDropdown = ref(false);
 
                                     <template #content>
                                         <DropdownLink
-                                            :href="route('profile.edit')"
+                                            :href="route('web.profile.edit')"
                                         >
                                             Profile
                                         </DropdownLink>
@@ -146,6 +152,12 @@ const showingNavigationDropdown = ref(false);
                         >
                             Dashboard
                         </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('web.cocktail.index')"
+                            :active="route().current('web.cocktail.index')"
+                        >
+                            Cocktails
+                        </ResponsiveNavLink>
                     </div>
 
                     <!-- Responsive Settings Options -->
@@ -164,7 +176,7 @@ const showingNavigationDropdown = ref(false);
                         </div>
 
                         <div class="mt-3 space-y-1">
-                            <ResponsiveNavLink :href="route('profile.edit')">
+                            <ResponsiveNavLink :href="route('web.profile.edit')">
                                 Profile
                             </ResponsiveNavLink>
                             <ResponsiveNavLink
