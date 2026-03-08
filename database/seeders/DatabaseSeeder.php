@@ -10,11 +10,19 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        $this->call(CocktailSeeder::class);
+        $user = User::where('email', 'test@test.com')->first() ?? new User();
+
+        $user->name              = 'Demo User';
+        $user->email             = 'test@test.com';
+        $user->password          = 'password'; 
+        $user->email_verified_at = now();
+        $user->save();
+
+        $this->call([
+            FormSchemaSeeder::class,
+            CocktailSeeder::class,
+        ]);
     }
 }

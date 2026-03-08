@@ -92,18 +92,7 @@ class FormSchemaSeeder extends Seeder
                                 ],
                             ],
                         ],
-                    ],
-                    [
-                    'title'  => 'Cost',
-                    'fields' => [
-                        [
-                            'key'       => 'attributes.costs',
-                            'type'      => 'number',
-                            'label'     => 'Costs',
-                            'placeholder' => '10.50',
-                        ],
-                    ],
-                ],
+                    ]
                 ],
             ]
         );

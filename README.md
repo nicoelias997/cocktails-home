@@ -1,59 +1,229 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Cocktails Home
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A cocktail management app built with Laravel 12, Vue 3, Inertia.js and MongoDB. Features a dynamic form system driven by database schemas, allowing new models to be added without touching frontend components.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Backend:** Laravel 12, PHP 8.2+, Laravel Sanctum
+- **Frontend:** Vue 3, Inertia.js, Tailwind CSS, Vite
+- **Database:** MongoDB
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Prerequisites
 
-## Learning Laravel
+- PHP 8.2+
+- [Composer](https://getcomposer.org/)
+- Node.js 18+ and npm
+- MongoDB 6+ running locally (default: `mongodb://localhost:27017`)
+- PHP MongoDB extension (`ext-mongodb`)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Installing the PHP MongoDB extension
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+pecl install mongodb
+```
 
-## Laravel Sponsors
+Then add `extension=php_mongodb` to your `php.ini`.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Setup
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### 1. Clone the repository
 
-## Contributing
+```bash
+git clone <repo-url> cocktails-home
+cd cocktails-home
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 2. Install dependencies
 
-## Code of Conduct
+```bash
+composer install
+npm install
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 3. Configure environment
 
-## Security Vulnerabilities
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Open `.env` and add/update the following:
 
-## License
+```env
+APP_URL=http://localhost:8000
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# MongoDB — do NOT set DB_CONNECTION=mongodb, models specify their connection explicitly
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DATABASE=cocktails_home
+
+# Sessions and cache — file driver avoids SQL/MongoDB compatibility issues
+SESSION_DRIVER=file
+CACHE_STORE=file
+
+# Sanctum — required for SPA authentication
+SANCTUM_STATEFUL_DOMAINS=localhost,localhost:8000,127.0.0.1,127.0.0.1:8000
+```
+
+> **Important:** do not set `DB_CONNECTION=mongodb`. Application models (`Cocktail`, `FormSchema`, `User`) declare `protected $connection = 'mongodb'` directly, so they connect to MongoDB regardless of the default connection. Sessions and cache use `file` because Laravel's `database` driver uses SQL-specific operations incompatible with MongoDB.
+
+### 4. Run migrations
+
+```bash
+php artisan migrate
+```
+
+### 5. Create storage symlink (for uploaded photos)
+
+```bash
+php artisan storage:link
+```
+
+### 6. Seed the database
+
+Creates a demo user, the cocktail form schema and 25 sample cocktails.
+
+```bash
+php artisan db:seed
+```
+
+**Demo credentials:**
+- Email: `test@test.com`
+- Password: `password`
+
+---
+
+## Running locally with indiviaul commands
+
+```bash
+# Backend only
+php artisan serve
+
+# Frontend only
+npm run dev
+
+# Build for production
+npm run build
+
+```
+
+---
+
+## Project structure
+
+```
+app/
+├── Http/
+│   ├── Controllers/Api/          # CocktailController, FormSchemaController
+│   ├── Requests/
+│   │   ├── ResourceRequest.php   # Abstract base — shared schema validation
+│   │   ├── Cocktail/             # StoreCocktailRequest, UpdateCocktailRequest
+│   │   └── FormSchema/           # UpdateFormSchemaRequest
+│   └── ...
+├── Models/
+│   ├── Cocktail.php
+│   └── FormSchema.php
+└── Services/
+    ├── CocktailService.php
+    └── FormSchemaService.php     # getByName(), validate()
+
+resources/js/
+├── Components/Dynamic/
+│   ├── DynamicForm.vue           # Renders sections from schema
+│   ├── DynamicTable.vue          # Generic table with actions
+│   └── FieldRepeater.vue         # Add/remove row lists
+└── Pages/Cocktail/
+    ├── Index.vue
+    ├── Create.vue
+    └── Edit.vue
+```
+
+---
+
+## API endpoints
+
+All routes require Sanctum session authentication.
+
+```
+GET    /api/schemas/{name}      Fetch form schema (e.g. /api/schemas/cocktails)
+
+GET    /api/cocktails           List  — ?alcohol_type= ?sort= ?per_page= ?page=
+POST   /api/cocktails           Create
+GET    /api/cocktails/{id}      Show
+PUT    /api/cocktails/{id}      Update
+DELETE /api/cocktails/{id}      Delete
+```
+
+---
+
+## Adding a new model
+
+1. Create `app/Models/YourModel.php` (MongoDB)
+2. Create `app/Services/YourModelService.php`
+3. Create `app/Http/Controllers/Api/YourModelController.php`
+4. Add routes in `routes/api.php`
+5. Add a schema entry in `FormSchemaSeeder` with `name: 'your_model'`
+6. Create `StoreYourModelRequest` and `UpdateYourModelRequest` extending `ResourceRequest`
+7. Create `Pages/YourModel/Create.vue` and `Edit.vue` pointing `loadSchema` to `/api/schemas/your_model`
+
+`DynamicForm`, `FieldRepeater` and `FormSchemaController` require no changes.
+
+---
+
+## Adding fields to an existing schema
+
+Open `database/seeders/FormSchemaSeeder.php` and add a new field inside the relevant section. For example, to add an ABV field to cocktails:
+
+```php
+[
+    'key'         => 'attributes.abv',
+    'type'        => 'number',
+    'label'       => 'ABV (%)',
+    'placeholder' => 'e.g. 12.5',
+    'min'         => 0,
+    'max'         => 100,
+],
+```
+
+Supported types: `text`, `textarea`, `number`, `select`, `checkbox`, `file`, `repeater`.
+
+For a `select` field, include an `options` array:
+
+```php
+[
+    'key'     => 'attributes.serving',
+    'type'    => 'select',
+    'label'   => 'Serving',
+    'options' => [
+        ['value' => 'straight', 'label' => 'Straight'],
+        ['value' => 'on_the_rocks', 'label' => 'On the rocks'],
+        ['value' => 'blended', 'label' => 'Blended'],
+    ],
+],
+```
+
+For a `repeater` field (list of rows), include `subfields`:
+
+```php
+[
+    'key'       => 'attributes.steps',
+    'type'      => 'repeater',
+    'label'     => 'Steps',
+    'subfields' => [
+        ['key' => 'description', 'type' => 'text', 'label' => 'Step', 'flex' => 1],
+    ],
+],
+```
+
+### Re-running the seeder
+
+The seeder uses `updateOrCreate` on the `name` field, so it is safe to re-run without creating duplicates:
+
+```bash
+php artisan db:seed --class=FormSchemaSeeder
+```
+
+The form will reflect the new fields immediately on the next page load — no Vue changes needed.

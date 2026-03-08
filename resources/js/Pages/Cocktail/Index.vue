@@ -39,6 +39,11 @@ const fetchCocktails = async () => {
   }
 }
 
+const applyFilter = () => {
+  filters.page = 1
+  fetchCocktails()
+}
+
 const removeCocktail = async (cocktail) => {
   if (!window.confirm(`Delete "${cocktail.name}"?`)) {
     return
@@ -74,7 +79,7 @@ onMounted(fetchCocktails)
         <div class="grid gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-3">
           <div>
             <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Alcohol type</label>
-            <select v-model="filters.alcohol_type" class="w-full rounded-md border-gray-300 text-sm" @change="fetchCocktails">
+            <select v-model="filters.alcohol_type" class="w-full rounded-md border-gray-300 text-sm" @change="applyFilter">
               <option value="">All</option>
               <option value="gin">Gin</option>
               <option value="vodka">Vodka</option>
@@ -86,7 +91,7 @@ onMounted(fetchCocktails)
           </div>
           <div>
             <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Order</label>
-            <select v-model="filters.sort" class="w-full rounded-md border-gray-300 text-sm" @change="fetchCocktails">
+            <select v-model="filters.sort" class="w-full rounded-md border-gray-300 text-sm" @change="applyFilter">
               <option value="created_desc">Newest first</option>
               <option value="created_asc">Oldest first</option>
             </select>
