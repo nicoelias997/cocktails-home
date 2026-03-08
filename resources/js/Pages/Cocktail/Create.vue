@@ -1,16 +1,19 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import DynamicForm from '@/Components/Dynamic/DynamicForm.vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import axios from 'axios'
-import { reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 
 const submitting = ref(false)
 const errors = ref({})
-const photo = ref(null)
+const sections = ref([])
+const schemaError = ref(null)
 
-const form = reactive({
+const form = ref({
   name: '',
   alcohol_type: 'other',
+  photo: null,
   attributes: {
     glass: '',
     garnish: '',
@@ -20,12 +23,13 @@ const form = reactive({
   },
 })
 
-const addIngredient = () => {
-  form.attributes.ingredients.push({ name: '', amount: '' })
-}
-
-const removeIngredient = (index) => {
-  form.attributes.ingredients.splice(index, 1)
+const loadSchema = async () => {
+  try {
+    const { data } = await axios.get('/api/schemas/cocktails')
+    sections.value = data.data ?? []
+  } catch {
+    schemaError.value = 'Could not load the form. Please refresh the page.'
+  }
 }
 
 const submit = async () => {
@@ -33,16 +37,15 @@ const submit = async () => {
   errors.value = {}
 
   const payload = new FormData()
-  payload.append('name', form.name)
-  payload.append('alcohol_type', form.alcohol_type)
-  payload.append('attributes', JSON.stringify(form.attributes))
-
-  if (photo.value) {
-    payload.append('photo', photo.value)
+  payload.append('name', form.value.name)
+  payload.append('alcohol_type', form.value.alcohol_type)
+  payload.append('attributes', JSON.stringify(form.value.attributes))
+  if (form.value.photo instanceof File) {
+    payload.append('photo', form.value.photo)
   }
 
   try {
-    await axios.post('/api/cocktails/create', payload)
+    await axios.post('/api/cocktails', payload)
     router.visit(route('web.cocktail.index'))
   } catch (error) {
     if (error.response?.status === 422) {
@@ -52,6 +55,8 @@ const submit = async () => {
     submitting.value = false
   }
 }
+
+onMounted(loadSchema)
 </script>
 
 <template>
@@ -69,140 +74,19 @@ const submit = async () => {
 
     <div class="py-8">
       <div class="mx-auto max-w-3xl space-y-5 px-4 sm:px-6 lg:px-8">
+        <div v-if="schemaError" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {{ schemaError }}
+        </div>
 
-        <!-- Basic info -->
-        <section class="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 class="text-base font-semibold text-gray-900">Basic info</h3>
+        <DynamicForm
+          v-else
+          :sections="sections"
+          :model-value="form"
+          :errors="errors"
+          :disabled="submitting"
+          @update:model-value="form = $event"
+        />
 
-          <div>
-            <label for="name" class="mb-1 block text-sm font-medium text-gray-700">Name</label>
-            <input
-              id="name"
-              v-model="form.name"
-              type="text"
-              required
-              class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-            <p v-if="errors.name?.[0]" class="mt-1 text-sm text-red-600">{{ errors.name[0] }}</p>
-          </div>
-
-          <div>
-            <label for="alcohol_type" class="mb-1 block text-sm font-medium text-gray-700">Alcohol type</label>
-            <select
-              id="alcohol_type"
-              v-model="form.alcohol_type"
-              class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-              <option value="gin">Gin</option>
-              <option value="vodka">Vodka</option>
-              <option value="rum">Rum</option>
-              <option value="whiskey">Whiskey</option>
-              <option value="tequila">Tequila</option>
-              <option value="other">Other</option>
-            </select>
-            <p v-if="errors.alcohol_type?.[0]" class="mt-1 text-sm text-red-600">{{ errors.alcohol_type[0] }}</p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Photo</label>
-            <input
-              type="file"
-              accept="image/*"
-              class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
-              @change="photo = $event.target.files?.[0] ?? null"
-            >
-            <p v-if="errors.photo?.[0]" class="mt-1 text-sm text-red-600">{{ errors.photo[0] }}</p>
-          </div>
-        </section>
-
-        <!-- Attributes -->
-        <section class="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 class="text-base font-semibold text-gray-900">Attributes</h3>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label for="glass" class="mb-1 block text-sm font-medium text-gray-700">Glass</label>
-              <input
-                id="glass"
-                v-model="form.attributes.glass"
-                type="text"
-                placeholder="e.g. rocks, coupe"
-                class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-            </div>
-
-            <div>
-              <label for="garnish" class="mb-1 block text-sm font-medium text-gray-700">Garnish</label>
-              <input
-                id="garnish"
-                v-model="form.attributes.garnish"
-                type="text"
-                placeholder="e.g. orange peel"
-                class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-            </div>
-          </div>
-
-          <div>
-            <label for="difficulty" class="mb-1 block text-sm font-medium text-gray-700">Difficulty</label>
-            <select
-              id="difficulty"
-              v-model="form.attributes.difficulty"
-              class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="instructions" class="mb-1 block text-sm font-medium text-gray-700">Instructions</label>
-            <textarea
-              id="instructions"
-              v-model="form.attributes.instructions"
-              rows="3"
-              placeholder="Describe how to prepare this cocktail..."
-              class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            />
-          </div>
-        </section>
-
-        <!-- Ingredients -->
-        <section class="space-y-3 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold text-gray-900">Ingredients</h3>
-            <button
-              type="button"
-              class="rounded-md bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-              @click="addIngredient"
-            >
-              + Add
-            </button>
-          </div>
-
-          <p v-if="form.attributes.ingredients.length === 0" class="text-sm text-gray-400">
-            No ingredients yet.
-          </p>
-
-          <div v-for="(ingredient, i) in form.attributes.ingredients" :key="i" class="flex items-center gap-2">
-            <input
-              v-model="ingredient.name"
-              type="text"
-              placeholder="Ingredient"
-              class="flex-1 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-            <input
-              v-model="ingredient.amount"
-              type="text"
-              placeholder="Amount"
-              class="w-28 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-            <button type="button" class="text-red-400 hover:text-red-600" @click="removeIngredient(i)">✕</button>
-          </div>
-        </section>
-
-        <!-- Actions -->
         <div class="flex items-center justify-end gap-3">
           <Link :href="route('web.cocktail.index')" class="text-sm text-gray-600 hover:text-gray-800">
             Cancel
@@ -216,7 +100,6 @@ const submit = async () => {
             {{ submitting ? 'Creating...' : 'Create cocktail' }}
           </button>
         </div>
-
       </div>
     </div>
   </AuthenticatedLayout>
