@@ -15,36 +15,31 @@ const typeColors = {
   other:   { bg: 'bg-violet-100', text: 'text-violet-700' },
 }
 
-const difficultyConfig = {
-  easy:   { label: 'Easy',   cls: 'bg-green-100 text-green-700'   },
-  medium: { label: 'Medium', cls: 'bg-amber-100 text-amber-700'   },
-  hard:   { label: 'Hard',   cls: 'bg-red-100   text-red-700'     },
-}
-
 const loading = ref(false)
-const items = ref([])
+const items   = ref([])
+const schemaSections = ref([])
 const viewingCocktail = ref(null)
 
 const typeColor = computed(() => typeColors[viewingCocktail.value?.alcohol_type] ?? { bg: 'bg-gray-100', text: 'text-gray-600' })
-const difficultyBadge = computed(() => difficultyConfig[viewingCocktail.value?.attributes?.difficulty] ?? null)
-const meta = ref({
-  current_page: 1,
-  last_page: 1,
-  total: 0,
-})
+
+// Flatten all attributes.* fields from the schema, preserving order
+const schemaFields = computed(() =>
+  schemaSections.value.flatMap(s => s.fields ?? []).filter(f => f.key?.startsWith('attributes.'))
+)
+
+const meta = ref({ current_page: 1, last_page: 1, total: 0 })
 
 const filters = reactive({
   alcohol_type: '',
-  sort: 'created_at',
+  sort: 'created_desc',
   per_page: 12,
   page: 1,
 })
 
 const columns = [
   { key: 'name', label: 'Name' },
-  { key: 'alcohol_type', label: 'Alcohol type' }
+  { key: 'alcohol_type', label: 'Alcohol type' },
 ]
-
 
 const fetchCocktails = async () => {
   loading.value = true
@@ -57,16 +52,20 @@ const fetchCocktails = async () => {
   }
 }
 
+const fetchSchema = async () => {
+  try {
+    const { data } = await axios.get('/api/schemas/cocktails')
+    schemaSections.value = data.data ?? []
+  } catch { /* schema optional — graceful degradation */ }
+}
+
 const applyFilter = () => {
   filters.page = 1
   fetchCocktails()
 }
 
 const removeCocktail = async (cocktail) => {
-  if (!window.confirm(`Delete "${cocktail.name}"?`)) {
-    return
-  }
-
+  if (!window.confirm(`Delete "${cocktail.name}"?`)) return
   await axios.delete(`/api/cocktails/${cocktail.id}`)
   await fetchCocktails()
 }
@@ -76,7 +75,13 @@ const goToPage = async (page) => {
   await fetchCocktails()
 }
 
-onMounted(fetchCocktails)
+// Helper: get attribute value by bare key (strip 'attributes.' prefix)
+const attrValue = (field) => {
+  const key = field.key.slice('attributes.'.length)
+  return viewingCocktail.value?.attributes?.[key]
+}
+
+onMounted(() => Promise.all([fetchCocktails(), fetchSchema()]))
 </script>
 
 <template>
@@ -182,7 +187,7 @@ onMounted(fetchCocktails)
 
           <!-- Name + spirit badge -->
           <div class="flex items-start justify-between gap-3">
-            <h3 class="text-xl font-bold text-gray-900 leading-tight">{{ viewingCocktail.name }}</h3>
+            <h3 class="text-xl font-bold leading-tight text-gray-900">{{ viewingCocktail.name }}</h3>
             <span
               class="mt-0.5 shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize"
               :class="[typeColor.bg, typeColor.text]"
@@ -191,74 +196,64 @@ onMounted(fetchCocktails)
             </span>
           </div>
 
-          <!-- Quick-info pills -->
-          <div v-if="viewingCocktail.attributes" class="flex flex-wrap gap-2 text-sm">
-            <span
-              v-if="viewingCocktail.attributes.glass"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15M14.25 3.104c.251.023.501.05.75.082M19.8 15a2.25 2.25 0 01-.659 1.591l-1.591 1.591a2.25 2.25 0 01-3.182 0l-1.591-1.591A2.25 2.25 0 0112 15.75h0a2.25 2.25 0 00-1.591.659l-1.591 1.591a2.25 2.25 0 01-3.182 0L4.045 16.409A2.25 2.25 0 013.386 14.818" />
-              </svg>
-              {{ viewingCocktail.attributes.glass }}
-            </span>
+          <!-- Dynamic attributes — driven by schema -->
+          <template v-for="field in schemaFields" :key="field.key">
+            <template v-if="attrValue(field) !== undefined && attrValue(field) !== '' && attrValue(field) !== null">
 
-            <span
-              v-if="viewingCocktail.attributes.garnish"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707" />
-              </svg>
-              {{ viewingCocktail.attributes.garnish }}
-            </span>
+              <!-- Repeater → table -->
+              <div v-if="field.type === 'repeater' && Array.isArray(attrValue(field)) && attrValue(field).length" class="space-y-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ field.label }}</p>
+                <ul class="overflow-hidden rounded-xl border border-gray-200">
+                  <li
+                    v-for="(row, i) in attrValue(field)"
+                    :key="i"
+                    class="flex items-center justify-between bg-white px-4 py-2.5 text-sm"
+                    :class="i > 0 ? 'border-t border-gray-100' : ''"
+                  >
+                    <template v-for="(val, colKey, colIdx) in row" :key="colKey">
+                      <span v-if="colIdx === 0" class="font-medium text-gray-800">{{ val }}</span>
+                      <span v-else class="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{{ val }}</span>
+                    </template>
+                  </li>
+                </ul>
+              </div>
 
-            <span
-              v-if="difficultyBadge"
-              class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold capitalize"
-              :class="difficultyBadge.cls"
-            >
-              {{ difficultyBadge.label }}
-            </span>
-          </div>
+              <!-- Textarea / long text → text block -->
+              <div v-else-if="field.type === 'textarea'" class="space-y-1.5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ field.label }}</p>
+                <p class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-700">
+                  {{ attrValue(field) }}
+                </p>
+              </div>
 
-          <!-- Ingredients -->
-          <div v-if="viewingCocktail.attributes?.ingredients?.length" class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Ingredients</p>
-            <ul class="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
-              <li
-                v-for="(ing, i) in viewingCocktail.attributes.ingredients"
-                :key="i"
-                class="flex items-center justify-between px-4 py-2.5 text-sm bg-white"
-              >
-                <span class="font-medium text-gray-800">{{ ing.name }}</span>
-                <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{{ ing.amount }}</span>
-              </li>
-            </ul>
-          </div>
+              <!-- Checkbox → Yes/No badge -->
+              <div v-else-if="field.type === 'checkbox'" class="flex items-center gap-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ field.label }}</p>
+                <span
+                  class="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                  :class="attrValue(field) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                >
+                  {{ attrValue(field) ? 'Yes' : 'No' }}
+                </span>
+              </div>
 
-          <!-- Instructions -->
-          <div v-if="viewingCocktail.attributes?.instructions" class="space-y-1.5">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Instructions</p>
-            <p class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-700">
-              {{ viewingCocktail.attributes.instructions }}
-            </p>
-          </div>
+              <!-- Scalar (text, number, select) → pill -->
+              <div v-else class="flex items-center gap-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ field.label }}</p>
+                <span class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-700">
+                  {{ attrValue(field) }}
+                </span>
+              </div>
 
-          <!-- Tags -->
-          <div v-if="viewingCocktail.attributes?.tags?.length" class="flex flex-wrap items-center gap-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Tags</p>
-            <span
-              v-for="tag in viewingCocktail.attributes.tags"
-              :key="tag"
-              class="rounded-full bg-indigo-50 px-3 py-0.5 text-xs font-medium text-indigo-700"
-            >
-              {{ tag }}
-            </span>
-          </div>
+            </template>
+          </template>
+
+          <!-- Fallback while schema loads -->
+          <p v-if="!schemaFields.length" class="italic text-sm text-gray-400">Loading details…</p>
 
         </div>
       </div>
+
     </Modal>
   </AuthenticatedLayout>
 </template>

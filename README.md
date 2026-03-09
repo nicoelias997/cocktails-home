@@ -1,6 +1,6 @@
 # Cocktails Home
 
-A cocktail management app built with Laravel 12, Vue 3, Inertia.js and MongoDB. Features a dynamic form system driven by database schemas, allowing new models to be added without touching frontend components.
+A cocktail management app built with **Laravel 12, Vue 3, Inertia.js and MongoDB**. Features a **fully dynamic form system** driven by database schemas: the frontend always fetches field definitions from the API — no hardcoded fields in Vue components. Form schemas can also be **created and edited live from the UI** without touching any code.
 
 ## Stack
 
@@ -33,7 +33,7 @@ Then add `extension=php_mongodb` to your `php.ini`.
 ### 1. Clone the repository
 
 ```bash
-git clone <repo-url> cocktails-home
+git clone https://github.com/nicoelias997/cocktails-home cocktails-home
 cd cocktails-home
 ```
 
@@ -51,24 +51,21 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-Open `.env` and add/update the following:
+Open `.env` and verify/update:
 
 ```env
 APP_URL=http://localhost:8000
 
-# MongoDB — do NOT set DB_CONNECTION=mongodb, models specify their connection explicitly
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DATABASE=cocktails_home
 
-# Sessions and cache — file driver avoids SQL/MongoDB compatibility issues
 SESSION_DRIVER=file
 CACHE_STORE=file
 
-# Sanctum — required for SPA authentication
 SANCTUM_STATEFUL_DOMAINS=localhost,localhost:8000,127.0.0.1,127.0.0.1:8000
 ```
 
-> **Important:** do not set `DB_CONNECTION=mongodb`. Application models (`Cocktail`, `FormSchema`, `User`) declare `protected $connection = 'mongodb'` directly, so they connect to MongoDB regardless of the default connection. Sessions and cache use `file` because Laravel's `database` driver uses SQL-specific operations incompatible with MongoDB.
+> **Note:** Do not set `DB_CONNECTION=mongodb`. Models declare `protected $connection = 'mongodb'` directly. Sessions and cache use `file` because Laravel's `database` driver requires SQL.
 
 ### 4. Run migrations
 
@@ -96,18 +93,14 @@ php artisan db:seed
 
 ---
 
-## Running locally with indiviaul commands
+## Running locally
 
 ```bash
-# Backend only
+# Terminal 1 — backend
 php artisan serve
 
-# Frontend only
+# Terminal 2 — frontend (HMR)
 npm run dev
-
-# Build for production
-npm run build
-
 ```
 
 ---
@@ -117,28 +110,34 @@ npm run build
 ```
 app/
 ├── Http/
-│   ├── Controllers/Api/          # CocktailController, FormSchemaController
+│   ├── Controllers/Api/
+│   │   ├── CocktailController.php
+│   │   └── FormSchemaController.php   # index, show, update
 │   ├── Requests/
-│   │   ├── ResourceRequest.php   # Abstract base — shared schema validation
-│   │   ├── Cocktail/             # StoreCocktailRequest, UpdateCocktailRequest
-│   │   └── FormSchema/           # UpdateFormSchemaRequest
+│   │   ├── ResourceRequest.php        # Abstract — applies schema validation on submit
+│   │   ├── Cocktail/                  # StoreCocktailRequest, UpdateCocktailRequest
+│   │   └── FormSchema/                # UpdateFormSchemaRequest
 │   └── ...
 ├── Models/
 │   ├── Cocktail.php
 │   └── FormSchema.php
 └── Services/
     ├── CocktailService.php
-    └── FormSchemaService.php     # getByName(), validate()
+    └── FormSchemaService.php          # index(), getByName(), validate(), update()
 
 resources/js/
 ├── Components/Dynamic/
-│   ├── DynamicForm.vue           # Renders sections from schema
-│   ├── DynamicTable.vue          # Generic table with actions
-│   └── FieldRepeater.vue         # Add/remove row lists
-└── Pages/Cocktail/
-    ├── Index.vue
-    ├── Create.vue
-    └── Edit.vue
+│   ├── DynamicForm.vue        # Renders any schema as a form (no hardcoded fields)
+│   ├── DynamicTable.vue       # Generic sortable/paginated table
+│   └── FieldRepeater.vue      # Add/remove row lists (for repeater fields)
+└── Pages/
+    ├── Cocktail/
+    │   ├── Index.vue           # List + detail modal (schema-driven)
+    │   ├── Create.vue          # Dynamic form, fields from API
+    │   └── Edit.vue            # Dynamic form, prefills from DB + schema
+    └── Schema/
+        ├── Index.vue           # List all form schemas
+        └── Edit.vue            # Visual schema editor (add/edit/delete fields)
 ```
 
 ---
@@ -148,14 +147,71 @@ resources/js/
 All routes require Sanctum session authentication.
 
 ```
-GET    /api/schemas/{name}      Fetch form schema (e.g. /api/schemas/cocktails)
+# Form schemas
+GET    /api/schemas                List all schemas
+GET    /api/schemas/{name}         Fetch schema sections (consumed by DynamicForm)
+PUT    /api/schemas/{name}         Update schema sections from the UI editor
 
-GET    /api/cocktails           List  — ?alcohol_type= ?sort= ?per_page= ?page=
-POST   /api/cocktails           Create
-GET    /api/cocktails/{id}      Show
-PUT    /api/cocktails/{id}      Update
-DELETE /api/cocktails/{id}      Delete
+# Cocktails
+GET    /api/cocktails              List — ?alcohol_type= ?sort= ?per_page= ?page=
+POST   /api/cocktails              Create
+GET    /api/cocktails/{id}         Show
+PUT    /api/cocktails/{id}         Update
+DELETE /api/cocktails/{id}         Delete
 ```
+
+---
+
+## Dynamic form system
+
+The form schema for each resource is stored in MongoDB as a document in the `form_schemas` collection. Each document contains an ordered list of **sections**, each with **fields**:
+
+```json
+{
+  "name": "cocktails",
+  "active": true,
+  "sections": [
+    {
+      "title": "Basic info",
+      "fields": [
+        { "key": "name",         "type": "text",   "label": "Name",         "required": true },
+        { "key": "alcohol_type", "type": "select", "label": "Alcohol type",  "options": [...] }
+      ]
+    },
+    {
+      "title": "Details",
+      "fields": [
+        { "key": "attributes.glass",        "type": "text",     "label": "Glass" },
+        { "key": "attributes.instructions", "type": "textarea", "label": "Instructions" },
+        { "key": "attributes.ingredients",  "type": "repeater", "label": "Ingredients",
+          "subfields": [
+            { "key": "name",   "type": "text",   "label": "Ingredient" },
+            { "key": "amount", "type": "text",   "label": "Amount" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Field key conventions
+
+| Key format | Where stored | Editable from Schema UI? |
+|------------|--------------|--------------------------|
+| `name`, `alcohol_type`, `photo` | Top-level Cocktail document fields | Label/type only (key locked 🔒) |
+| `attributes.*` | Inside the `attributes` sub-document | Fully editable |
+
+### Editing schemas from the UI
+
+Navigate to **Schemas** in the sidebar (or `/schemas`) to see all available schemas. Click **Edit fields** to open the visual editor where you can:
+
+- Add, rename, reorder or delete fields
+- Change field type (`text`, `textarea`, `number`, `select`, `checkbox`, `file`, `repeater`)
+- Configure select options and repeater sub-fields inline
+- Organize fields into named sections
+
+Changes take effect on the next page load of the affected form — no code deployment needed.
 
 ---
 
@@ -164,66 +220,24 @@ DELETE /api/cocktails/{id}      Delete
 1. Create `app/Models/YourModel.php` (MongoDB)
 2. Create `app/Services/YourModelService.php`
 3. Create `app/Http/Controllers/Api/YourModelController.php`
-4. Add routes in `routes/api.php`
-5. Add a schema entry in `FormSchemaSeeder` with `name: 'your_model'`
-6. Create `StoreYourModelRequest` and `UpdateYourModelRequest` extending `ResourceRequest`
-7. Create `Pages/YourModel/Create.vue` and `Edit.vue` pointing `loadSchema` to `/api/schemas/your_model`
+4. Create `StoreYourModelRequest` and `UpdateYourModelRequest` extending `ResourceRequest` (set `schemaName()` to your schema name)
+5. Add CRUD routes in `routes/api.php` and web routes in `routes/web.php`
+6. Seed a schema: add an entry in `FormSchemaSeeder` with `'name' => 'your_model'` and run `php artisan db:seed --class=FormSchemaSeeder`
+7. Create `Pages/YourModel/Index.vue`, `Create.vue`, `Edit.vue` — `DynamicForm` and `DynamicTable` require no changes
+8. Add a nav entry in `AuthenticatedLayout.vue`
 
-`DynamicForm`, `FieldRepeater` and `FormSchemaController` require no changes.
+The Schema Editor at `/schemas/your_model/edit` will work automatically for any schema in the database.
 
 ---
 
-## Adding fields to an existing schema
+## Adding fields to an existing schema (code alternative)
 
-Open `database/seeders/FormSchemaSeeder.php` and add a new field inside the relevant section. For example, to add an ABV field to cocktails:
-
-```php
-[
-    'key'         => 'attributes.abv',
-    'type'        => 'number',
-    'label'       => 'ABV (%)',
-    'placeholder' => 'e.g. 12.5',
-    'min'         => 0,
-    'max'         => 100,
-],
-```
-
-Supported types: `text`, `textarea`, `number`, `select`, `checkbox`, `file`, `repeater`.
-
-For a `select` field, include an `options` array:
-
-```php
-[
-    'key'     => 'attributes.serving',
-    'type'    => 'select',
-    'label'   => 'Serving',
-    'options' => [
-        ['value' => 'straight', 'label' => 'Straight'],
-        ['value' => 'on_the_rocks', 'label' => 'On the rocks'],
-        ['value' => 'blended', 'label' => 'Blended'],
-    ],
-],
-```
-
-For a `repeater` field (list of rows), include `subfields`:
-
-```php
-[
-    'key'       => 'attributes.steps',
-    'type'      => 'repeater',
-    'label'     => 'Steps',
-    'subfields' => [
-        ['key' => 'description', 'type' => 'text', 'label' => 'Step', 'flex' => 1],
-    ],
-],
-```
-
-### Re-running the seeder
-
-The seeder uses `updateOrCreate` on the `name` field, so it is safe to re-run without creating duplicates:
+Schema fields can be edited from the UI at `/schemas`. Alternatively, edit `database/seeders/FormSchemaSeeder.php` and re-run:
 
 ```bash
 php artisan db:seed --class=FormSchemaSeeder
 ```
 
-The form will reflect the new fields immediately on the next page load — no Vue changes needed.
+> The seeder uses `updateOrCreate` on `name`, so re-running is safe.
+
+Supported field types: `text`, `textarea`, `number`, `select`, `checkbox`, `file`, `repeater`.

@@ -24,9 +24,12 @@ Route::middleware(['auth', 'verified'])
         Route::get('/cocktails/create', fn () => Inertia::render('Cocktail/Create'))->name('cocktail.create');
         Route::get('/cocktails/{id}/edit', fn ($id) => Inertia::render('Cocktail/Edit', ['id' => $id]))->name('cocktail.edit');
 
+        Route::get('/schemas', fn () => Inertia::render('Schema/Index'))->name('schema.index');
+        Route::get('/schemas/{name}/edit', fn ($name) => Inertia::render('Schema/Edit', ['name' => $name]))->name('schema.edit');
+
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
+    });
 
 require __DIR__.'/auth.php';

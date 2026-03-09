@@ -11,8 +11,10 @@ Route::middleware('auth:sanctum')->name('api.')->group(function () {
     Route::prefix('schemas')
         ->name('schemas.')
         ->group(function () {
+            Route::get('', [FormSchemaController::class, 'index'])->name('index');
             Route::get('{name}', [FormSchemaController::class, 'show'])->name('show');
-    });
+            Route::put('{name}', [FormSchemaController::class, 'update'])->name('update');
+        });
 
     Route::prefix('cocktails')->name('cocktails.')->group(function () {
         Route::get('', [CocktailController::class, 'index'])->name('index');

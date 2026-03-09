@@ -9,34 +9,47 @@ const props = defineProps({
   id: { type: String, required: true },
 })
 
-const loading = ref(false)
-const submitting = ref(false)
-const errors = ref({})
-const sections = ref([])
+const loading      = ref(false)
+const submitting   = ref(false)
+const errors       = ref({})
+const sections     = ref([])
 const currentFiles = ref({})
-const schemaError = ref(null)
+const schemaError  = ref(null)
 
+// Form state starts minimal — populated from schema + cocktail data on mount
 const form = ref({
   name: '',
   alcohol_type: 'other',
   photo: null,
   remove_photo: false,
-  attributes: {
-    glass: '',
-    garnish: '',
-    difficulty: 'easy',
-    instructions: '',
-    ingredients: [],
-  },
+  attributes: {},
 })
 
-const loadSchema = async () => {
-  try {
-    const { data } = await axios.get('/api/schemas/cocktails')
-    sections.value = data.data ?? []
-  } catch {
-    schemaError.value = 'Could not load the form. Please refresh the page.'
+/**
+ * Build an initial attributes object from the schema fields.
+ * Repeater fields → [], all others → ''.
+ * Preserves any existing values that were loaded from the cocktail.
+ */
+const initAttributesFromSchema = (schemaSections, existingAttrs = {}) => {
+  const attrs = {}
+  for (const section of schemaSections) {
+    for (const field of section.fields ?? []) {
+      if (!field.key?.startsWith('attributes.')) continue
+      const attrKey = field.key.slice('attributes.'.length)
+      // Prefer real saved value; fall back to empty default per type
+      if (Object.prototype.hasOwnProperty.call(existingAttrs, attrKey)) {
+        attrs[attrKey] = existingAttrs[attrKey]
+      } else {
+        attrs[attrKey] = field.type === 'repeater' ? [] : ''
+      }
+    }
   }
+  return attrs
+}
+
+const loadSchema = async () => {
+  const { data } = await axios.get('/api/schemas/cocktails')
+  sections.value = data.data ?? []
 }
 
 const loadCocktail = async () => {
@@ -47,19 +60,29 @@ const loadCocktail = async () => {
     ...form.value,
     name: cocktail.name ?? '',
     alcohol_type: cocktail.alcohol_type ?? 'other',
-    attributes: {
-      glass: cocktail.attributes?.glass ?? '',
-      garnish: cocktail.attributes?.garnish ?? '',
-      difficulty: cocktail.attributes?.difficulty ?? 'easy',
-      instructions: cocktail.attributes?.instructions ?? '',
-      ingredients: cocktail.attributes?.ingredients ?? [],
-    },
+    attributes: cocktail.attributes ?? {},
   }
 
   if (cocktail.photo_path) {
     currentFiles.value = { photo: cocktail.photo_path }
   }
 }
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    await Promise.all([loadSchema(), loadCocktail()])
+    // Merge — schema defines the structure, DB values fill it in
+    form.value = {
+      ...form.value,
+      attributes: initAttributesFromSchema(sections.value, form.value.attributes),
+    }
+  } catch {
+    schemaError.value = 'Could not load the form. Please refresh the page.'
+  } finally {
+    loading.value = false
+  }
+})
 
 const submit = async () => {
   submitting.value = true
@@ -69,7 +92,7 @@ const submit = async () => {
   payload.append('name', form.value.name)
   payload.append('alcohol_type', form.value.alcohol_type)
   payload.append('remove_photo', form.value.remove_photo ? '1' : '0')
-  payload.append('attributes', JSON.stringify(form.value.attributes))
+  payload.append('attributes', JSON.stringify(form.value.attributes ?? {}))
   if (form.value.photo instanceof File) {
     payload.append('photo', form.value.photo)
   }
@@ -85,15 +108,6 @@ const submit = async () => {
     submitting.value = false
   }
 }
-
-onMounted(async () => {
-  loading.value = true
-  try {
-    await Promise.all([loadSchema(), loadCocktail()])
-  } finally {
-    loading.value = false
-  }
-})
 </script>
 
 <template>

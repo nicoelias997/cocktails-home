@@ -9,6 +9,34 @@ use Illuminate\Validation\ValidationException;
 class FormSchemaService
 {
     /**
+     * Return a summary list of all schemas.
+     */
+    public function index(): array
+    {
+        return FormSchema::query()
+            ->orderBy('name')
+            ->get()
+            ->map(fn (FormSchema $s) => $this->mapSchema($s))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Replace the sections of an existing schema and return the updated record.
+     */
+    public function update(string $name, array $sections): array
+    {
+        $schema = FormSchema::query()
+            ->where('name', $name)
+            ->firstOrFail();
+
+        $schema->sections = $sections;
+        $schema->save();
+
+        return $this->mapSchema($schema);
+    }
+
+    /**
      * Return the full sections array for the given schema name.
      * Used by the API endpoint consumed by the frontend.
      */
@@ -138,5 +166,19 @@ class FormSchemaService
         }
 
         return array_values(array_filter($value, fn ($item) => is_array($item)));
+    }
+
+    private function mapSchema(FormSchema $schema): array
+    {
+        $fieldCount = collect($schema->sections ?? [])
+            ->sum(fn (array $s) => count($s['fields'] ?? []));
+
+        return [
+            'name'        => $schema->name,
+            'active'      => (bool) $schema->active,
+            'sections'    => $schema->sections ?? [],
+            'field_count' => $fieldCount,
+            'updated_at'  => $schema->updated_at?->toISOString(),
+        ];
     }
 }

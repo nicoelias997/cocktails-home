@@ -5,28 +5,41 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import axios from 'axios'
 import { onMounted, ref } from 'vue'
 
-const submitting = ref(false)
-const errors = ref({})
-const sections = ref([])
+const submitting  = ref(false)
+const errors      = ref({})
+const sections    = ref([])
 const schemaError = ref(null)
 
+// Form state — initialised dynamically from schema after load
 const form = ref({
   name: '',
   alcohol_type: 'other',
   photo: null,
-  attributes: {
-    glass: '',
-    garnish: '',
-    difficulty: 'easy',
-    instructions: '',
-    ingredients: [],
-  },
 })
+
+/**
+ * Walk the schema sections and ensure every field that maps to
+ * "attributes.*" has a corresponding key initialized inside form.attributes.
+ * Field types that carry sub-items (repeater) start as [].
+ * Everything else starts as ''.
+ */
+const initAttributesFromSchema = (schemaSections) => {
+  const attrs = {}
+  for (const section of schemaSections) {
+    for (const field of section.fields ?? []) {
+      if (!field.key?.startsWith('attributes.')) continue
+      const attrKey = field.key.slice('attributes.'.length)
+      attrs[attrKey] = field.type === 'repeater' ? [] : ''
+    }
+  }
+  form.value = { ...form.value, attributes: attrs }
+}
 
 const loadSchema = async () => {
   try {
     const { data } = await axios.get('/api/schemas/cocktails')
     sections.value = data.data ?? []
+    initAttributesFromSchema(sections.value)
   } catch {
     schemaError.value = 'Could not load the form. Please refresh the page.'
   }
@@ -39,7 +52,7 @@ const submit = async () => {
   const payload = new FormData()
   payload.append('name', form.value.name)
   payload.append('alcohol_type', form.value.alcohol_type)
-  payload.append('attributes', JSON.stringify(form.value.attributes))
+  payload.append('attributes', JSON.stringify(form.value.attributes ?? {}))
   if (form.value.photo instanceof File) {
     payload.append('photo', form.value.photo)
   }
