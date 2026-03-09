@@ -88,6 +88,8 @@ const addSection = () => {
 }
 
 const removeSection = (si) => {
+  const hasLocked = sections.value[si].fields?.some(isBaseField)
+  if (hasLocked) return
   if (!window.confirm('Delete this section and all its fields?')) return
   sections.value.splice(si, 1)
 }
@@ -206,7 +208,10 @@ const totalFields = computed(() =>
               </div>
               <button
                 type="button"
-                class="shrink-0 rounded-md px-2 py-1 text-xs text-red-400 transition hover:bg-red-50 hover:text-red-700"
+                :disabled="section.fields?.some(isBaseField)"
+                :title="section.fields?.some(isBaseField) ? 'Cannot delete a section that contains model fields' : 'Delete section'"
+                class="shrink-0 rounded-md px-2 py-1 text-xs transition"
+                :class="section.fields?.some(isBaseField) ? 'cursor-not-allowed text-gray-300' : 'text-red-400 hover:bg-red-50 hover:text-red-700'"
                 @click="removeSection(si)"
               >
                 Delete section

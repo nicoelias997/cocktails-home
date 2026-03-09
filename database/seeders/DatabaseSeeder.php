@@ -16,8 +16,9 @@ class DatabaseSeeder extends Seeder
 
         $user->name              = 'Demo User';
         $user->email             = 'test@test.com';
-        $user->password          = 'password'; 
+        $user->password          = 'password';
         $user->email_verified_at = now();
+        $user->is_admin          = true;
         $user->save();
 
         $this->call([

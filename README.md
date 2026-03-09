@@ -16,7 +16,7 @@ A cocktail management app built with **Laravel 12, Vue 3, Inertia.js and MongoDB
 - [Composer](https://getcomposer.org/)
 - Node.js 18+ and npm
 - MongoDB 6+ running locally (default: `mongodb://localhost:27017`)
-- PHP MongoDB extension (`ext-mongodb`)
+- PHP MongoDB extension `ext-mongodb` 1.x (`mongodb/mongodb` 2.x requires ext-mongodb 2.x — see note below)
 
 ### Installing the PHP MongoDB extension
 
@@ -24,7 +24,9 @@ A cocktail management app built with **Laravel 12, Vue 3, Inertia.js and MongoDB
 pecl install mongodb
 ```
 
-Then add `extension=php_mongodb` to your `php.ini`.
+Then add `extension=mongodb` to your `php.ini`.
+
+> **Note on extension version:** The project uses `mongodb/mongodb ^2.0` which requires `ext-mongodb ^2.x`. If your local PHP has ext-mongodb 1.x the app will still work at runtime, but upgrade to 2.x for full compatibility. The production Docker image (`serversideup/php:8.2-fpm-nginx`) ships ext-mongodb 2.x out of the box.
 
 ---
 
@@ -56,6 +58,7 @@ Open `.env` and verify/update:
 ```env
 APP_URL=http://localhost:8000
 
+DB_CONNECTION=mongodb
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DATABASE=cocktails_home
 
@@ -65,7 +68,7 @@ CACHE_STORE=file
 SANCTUM_STATEFUL_DOMAINS=localhost,localhost:8000,127.0.0.1,127.0.0.1:8000
 ```
 
-> **Note:** Do not set `DB_CONNECTION=mongodb`. Models declare `protected $connection = 'mongodb'` directly. Sessions and cache use `file` because Laravel's `database` driver requires SQL.
+> **Note:** Sessions and cache use `file` because Laravel's `database` driver requires SQL.
 
 ### 4. Run migrations
 
@@ -90,10 +93,18 @@ php artisan db:seed
 **Demo credentials:**
 - Email: `test@test.com`
 - Password: `password`
+- Role: admin (can access the Schema editor)
 
 ---
 
 ## Running locally
+
+```bash
+# Runs Laravel server, queue listener, logs and Vite concurrently
+composer run dev
+```
+
+Or separately:
 
 ```bash
 # Terminal 1 — backend
@@ -112,7 +123,9 @@ app/
 ├── Http/
 │   ├── Controllers/Api/
 │   │   ├── CocktailController.php
-│   │   └── FormSchemaController.php   # index, show, update
+│   │   └── FormSchemaController.php   # index, show, update (update: admin only)
+│   ├── Middleware/
+│   │   └── EnsureAdmin.php            # Aborts 404 for non-admin users
 │   ├── Requests/
 │   │   ├── ResourceRequest.php        # Abstract — applies schema validation on submit
 │   │   ├── Cocktail/                  # StoreCocktailRequest, UpdateCocktailRequest
@@ -120,7 +133,8 @@ app/
 │   └── ...
 ├── Models/
 │   ├── Cocktail.php
-│   └── FormSchema.php
+│   ├── FormSchema.php
+│   └── User.php                       # is_admin (boolean) field
 └── Services/
     ├── CocktailService.php
     └── FormSchemaService.php          # index(), getByName(), validate(), update()
@@ -150,7 +164,7 @@ All routes require Sanctum session authentication.
 # Form schemas
 GET    /api/schemas                List all schemas
 GET    /api/schemas/{name}         Fetch schema sections (consumed by DynamicForm)
-PUT    /api/schemas/{name}         Update schema sections from the UI editor
+PUT    /api/schemas/{name}         Update schema sections  [admin only]
 
 # Cocktails
 GET    /api/cocktails              List — ?alcohol_type= ?sort= ?per_page= ?page=
@@ -202,7 +216,14 @@ The form schema for each resource is stored in MongoDB as a document in the `for
 | `name`, `alcohol_type`, `photo` | Top-level Cocktail document fields | Label/type only (key locked 🔒) |
 | `attributes.*` | Inside the `attributes` sub-document | Fully editable |
 
-### Editing schemas from the UI
+### Editing schemas from the UI (admin only)
+
+The schema editor is restricted to admin users. Non-admin requests to `/schemas` return 404. To grant admin access, set `is_admin: true` on the user document:
+
+```bash
+php artisan tinker
+>>> App\Models\User::where('email', 'you@example.com')->first()->update(['is_admin' => true])
+```
 
 Navigate to **Schemas** in the sidebar (or `/schemas`) to see all available schemas. Click **Edit fields** to open the visual editor where you can:
 
@@ -224,7 +245,7 @@ Changes take effect on the next page load of the affected form — no code deplo
 5. Add CRUD routes in `routes/api.php` and web routes in `routes/web.php`
 6. Seed a schema: add an entry in `FormSchemaSeeder` with `'name' => 'your_model'` and run `php artisan db:seed --class=FormSchemaSeeder`
 7. Create `Pages/YourModel/Index.vue`, `Create.vue`, `Edit.vue` — `DynamicForm` and `DynamicTable` require no changes
-8. Add a nav entry in `AuthenticatedLayout.vue`
+8. Add a nav entry in `AuthenticatedLayout.vue` (add `adminOnly: true` if the section should be admin-restricted)
 
 The Schema Editor at `/schemas/your_model/edit` will work automatically for any schema in the database.
 
