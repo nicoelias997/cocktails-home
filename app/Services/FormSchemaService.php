@@ -145,6 +145,11 @@ class FormSchemaService
     {
         $stringValue = is_string($value) ? trim($value) : (string) $value;
 
+        // Allow empty value when the field is not required
+        if ($stringValue === '') {
+            return '';
+        }
+
         $allowed = collect($field['options'] ?? [])
             ->map(fn ($opt) => is_array($opt) ? ($opt['value'] ?? null) : (string) $opt)
             ->filter()
