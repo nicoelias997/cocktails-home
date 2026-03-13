@@ -26,7 +26,7 @@ pecl install mongodb
 
 Then add `extension=mongodb` to your `php.ini`.
 
-> **Note on extension version:** The project uses `mongodb/mongodb ^2.0` which requires `ext-mongodb ^2.x`. If your local PHP has ext-mongodb 1.x the app will still work at runtime, but upgrade to 2.x for full compatibility. The production Docker image (`serversideup/php:8.2-fpm-nginx`) ships ext-mongodb 2.x out of the box.
+> **Note on extension version:** The current `composer.lock` resolves `mongodb/mongodb` to `1.21.3`, which requires `ext-mongodb ^1.21`. The production Docker image pins the PHP extension to `mongodb-1.21.0` during build so Railway matches the locked dependencies. If you later update the lock file to `mongodb/mongodb 2.x`, update the Docker image to `pecl install mongodb` again.
 
 ---
 
@@ -113,6 +113,41 @@ php artisan serve
 # Terminal 2 — frontend (HMR)
 npm run dev
 ```
+
+---
+
+## Deploying on Railway
+
+Use the repository in `Dockerfile` mode. This avoids Nixpacks entirely and ensures `ext-mongodb` is installed before Composer validates platform requirements.
+
+### Railway setup
+
+- Builder: `Dockerfile`
+- Start command: leave empty in the UI, or use the one from `railway.toml`
+- Healthcheck path: `/`
+
+### Required variables
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=base64:your-generated-key
+APP_URL=https://your-service.up.railway.app
+
+DB_CONNECTION=mongodb
+MONGODB_URI=your-railway-mongodb-uri
+MONGODB_DATABASE=cocktails_home
+
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
+```
+
+### Notes
+
+- The container installs `ext-mongodb 1.21.x` with `pecl install mongodb-1.21.0`, matching the current `composer.lock`.
+- `QUEUE_CONNECTION=sync` is recommended unless you add Redis or a SQL-backed queue worker service.
+- The startup script runs `php artisan migrate --force` and `php artisan storage:link` before binding Laravel to Railway's `$PORT`.
 
 ---
 
